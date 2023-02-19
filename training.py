@@ -1,18 +1,13 @@
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
 from tqdm.notebook import tqdm
 from torch.utils.data import DataLoader
 from sklearn.metrics import confusion_matrix, classification_report
+import argparse
 
 from data.loader import TrichDataset
 from utils.model import ModelSA
 from utils.loss import FocalLoss
-
-if torch.cuda.is_available():
-    device = torch.device('cuda')
-else:
-    device = torch.device('cpu')
 
 class MyFrame():
     def __init__(self, net, learning_rate, device, evalmode=False):
@@ -48,11 +43,7 @@ class MyFrame():
         print ('update learning rate: %f -> %f' % (self.lr, new_lr))
         self.lr = new_lr  
 
-def trainer(epoch, epochs, train_loader, solver, smart=False):
-    keep_training = True
-    no_optim = 0
-    train_epoch_best_loss = INITAL_EPOCH_LOSS
-    prev_loss = 1
+def trainer(epoch, epochs, train_loader, solver):    
     print('Epoch {}/{}'.format(epoch, epochs))
     predlist = []
     masklist = []
@@ -89,9 +80,9 @@ def trainer(epoch, epochs, train_loader, solver, smart=False):
     print('Learning rate: ', solver.lr)
 
     print('---------------------------------------------')
-    return train_epoch_loss, keep_training
+    return train_epoch_loss
 
-def tester(model, test_loader, test_best_loss, solver, num, logfile=None, smart=True):
+def tester(model, model_path, test_loader, test_best_loss, solver, num, smart=True):
     test_loss = 0
     test_pred = []
     test_mask = []
@@ -145,7 +136,7 @@ def tester(model, test_loader, test_best_loss, solver, num, logfile=None, smart=
         print('---------------------------------------------')
         return test_loss, test_best_loss, num
 
-def train(init=True):
+def train(model_path, init=True):
     solver = MyFrame(model, learning_rate, device)
 
     tr_Loss = []
@@ -157,6 +148,9 @@ def train(init=True):
     tbl = 100000000000
     num=0
 
+    if init:
+        solver.load(model_path)
+
     for epoch in range(start_ep+1, epochs + 1):
         
         logfile = None
@@ -167,7 +161,7 @@ def train(init=True):
 
         tr_comp = [tr_Loss, EP]
 
-        lt, tbln, num = tester(solver.net, test_loader, tbl, solver, num, logfile)
+        lt, tbln, num = tester(solver.net, model_path, test_loader, tbl, solver, num, logfile)
         if tbln<=tbl: tbl = tbln
         te_Loss += [lt]
 
@@ -177,17 +171,29 @@ def train(init=True):
         else: break
 
 if __name__ == '__main__':
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--root_path", help="root to the dataset")
+    parser.add_argument("--model_path", help="path of the pth file")
+    args = parser.parse_args()
+
     # Dataset path, model path and hyperparameters
-    root_path = ''
-    model_path = ''
+    root_path = args.root_path
+    model_path = args.model_path
     batch_size = 8
 
     learning_rate = 0.0002
     epochs = 20
 
+    if torch.cuda.is_available():
+        device = torch.device('cuda')
+    else:
+        device = torch.device('cpu')
+
     INITAL_EPOCH_LOSS = 10
     NUM_EARLY_STOP = 20
     NUM_UPDATE_LR = 3
+
+    classes = ['TB', 'TE']
 
     train_dataset = TrichDataset(root_path, 'Train')
     test_dataset = TrichDataset(root_path, 'Test')
@@ -203,4 +209,4 @@ if __name__ == '__main__':
     pytorch_total_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
     print("Parameters: ", pytorch_total_params)
 
-    train()
+    train(model_path)

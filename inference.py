@@ -1,32 +1,39 @@
 import torch
+import argparse
 
 from data.test_loader import loader
 from utils.model import ModelSA
 
-if torch.cuda.is_available():
-    device = torch.device('cuda')
-else:
-    device = torch.device('cpu')
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--img_path", help="path of the image to be checked")
+    parser.add_argument("--model_path", help="path of the pth file", default='./Weights/best.pth')
+    args = parser.parse_args()
 
-classes = ['TB', 'TE']
+    if torch.cuda.is_available():
+        device = torch.device('cuda')
+    else:
+        device = torch.device('cpu')
 
-# Change image path here
-img_path = ''    
+    classes = ['TB', 'TE']
 
-# Change weights path, if necessary
-model_path = './Weights/best.pth'
+    # Change image path here
+    img_path = args.img_path   
 
-# Loading the image
-img = loader(img_path)
-img = img.to(device)
+    # Change weights path, if necessary
+    model_path = args.model_path
 
-model = ModelSA()
-model = model.to(device)
+    # Loading the image
+    img = loader(img_path)
+    img = img.to(device)
 
-model.load_state_dict(torch.load(model_path))
-model.eval()
+    model = ModelSA()
+    model = model.to(device)
 
-pred = model.forward(img)
-indx = torch.argmax(pred[0])
+    model.load_state_dict(torch.load(model_path))
+    model.eval()
 
-print('The prediction is: ', classes[indx])
+    pred = model.forward(img)
+    indx = torch.argmax(pred[0])
+
+    print('The prediction is: ', classes[indx])
